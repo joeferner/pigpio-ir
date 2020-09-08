@@ -1,2 +1,2 @@
-export { PigpioIr, PigpioIrFileOptions } from './PigpioIr';
+export * from './PigpioIr';
 export { PigpioIrFile, Remote, Button } from './PigpioIrFile';

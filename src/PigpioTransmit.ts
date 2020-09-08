@@ -44,7 +44,6 @@ export class PigpioTransmit {
             on = !on;
         }
 
-        console.log(waveform);
         pigpio.waveAddGeneric(waveform);
         const waveId = pigpio.waveCreate();
         if (waveId < 0) {

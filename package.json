@@ -12,11 +12,13 @@
     "lint-staged": "lint-staged",
     "pre-commit": "npm run format && npm run lint-staged",
     "irrecord": "ts-node ./src/irrecord.ts",
-    "irplay": "ts-node ./src/irplay.ts"
+    "irplay": "ts-node ./src/irplay.ts",
+    "irlisten": "ts-node ./src/irlisten.ts"
   },
   "bin": {
     "irrecord": "./dist/irrecord.js",
-    "irplay": "./dist/irplay.js"
+    "irplay": "./dist/irplay.js",
+    "irlisten": "./dist/irlisten.js"
   },
   "keywords": [
     "raspberry-pi",

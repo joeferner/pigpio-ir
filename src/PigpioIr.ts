@@ -1,8 +1,9 @@
 import { AhoCorasick, AhoCorasickButton, AhoCorasickOptions } from './AhoCorasick';
 import fs from 'fs';
-import { PigpioIrFile, Remote } from './PigpioIrFile';
+import { Button, PigpioIrFile, Remote } from './PigpioIrFile';
 import pigpio from 'pigpio';
 import { PigpioTransmit } from './PigpioTransmit';
+import events from 'events';
 
 const PIN_NOT_SET = -1;
 const CARRIER_FREQUENCY = 38000;
@@ -19,7 +20,18 @@ export interface PigpioIrFileOptions extends AhoCorasickOptions {
     inputPin?: number;
 }
 
-export class PigpioIr {
+export interface ButtonEventData {
+    raw: AhoCorasickButton;
+    remoteName: string;
+    buttonName: string;
+    button: Button;
+}
+
+export interface PigpioIrEvents {
+    on(event: 'button', listener: (data: ButtonEventData) => void): this;
+}
+
+export class PigpioIr extends events.EventEmitter implements PigpioIrEvents {
     private static readonly DEFAULT_OPTIONS: Required<PigpioIrOptions> = {
         ...AhoCorasick.DEFAULT_OPTIONS,
         remotes: {},
@@ -37,8 +49,10 @@ export class PigpioIr {
     private inputGpio: pigpio.Gpio | undefined;
     private outputGpio: pigpio.Gpio | undefined;
     private outputPin: number | undefined;
+    private listenFn?: (level: number, tick: number) => void;
 
     private constructor(options: PigpioIrOptions) {
+        super();
         this.options = { ...PigpioIr.DEFAULT_OPTIONS, ...options };
         this.ahoCorasick = new AhoCorasick(
             PigpioIr.fileButtonsToAhoCorasickButtons(this.options.remotes),
@@ -99,27 +113,32 @@ export class PigpioIr {
             throw new Error('input pin not defined');
         }
         const gpio: pigpio.Gpio = this.inputGpio;
-        return new Promise<number[]>((resolve) => {
-            const signal: number[] = [];
-            let startTime: number | null = null;
-            let lastTick: number | null = null;
-            gpio.on('alert', (level, tick) => {
-                if (lastTick !== null) {
-                    signal.push(tick - lastTick);
-                }
-                if (startTime === null) {
-                    setTimeout(() => {
-                        startTime = null;
-                        resolve(signal);
-                    }, timeout);
-                    lastTick = startTime = tick;
-                }
-                lastTick = tick;
-            });
 
+        let myResolve: (signal: number[]) => void;
+        const signal: number[] = [];
+        let startTime: number | null = null;
+        let lastTick: number | null = null;
+        const alertFn = (level: number, tick: number) => {
+            if (lastTick !== null) {
+                signal.push(tick - lastTick);
+            }
+            if (startTime === null) {
+                setTimeout(() => {
+                    startTime = null;
+                    myResolve(signal);
+                }, timeout);
+                lastTick = startTime = tick;
+            }
+            lastTick = tick;
+        };
+
+        return new Promise<number[]>((resolve) => {
+            myResolve = resolve;
+            gpio.on('alert', alertFn);
             gpio.enableAlert();
         }).finally(() => {
             gpio.disableAlert();
+            gpio.off('alert', alertFn);
         });
     }
 
@@ -182,5 +201,49 @@ export class PigpioIr {
             reqOptions.timeout,
             CARRIER_FREQUENCY,
         );
+    }
+
+    public start(): void {
+        if (this.listenFn) {
+            throw new Error('listening already started');
+        }
+        if (!this.inputGpio) {
+            throw new Error('input pin not defined');
+        }
+        const gpio: pigpio.Gpio = this.inputGpio;
+
+        let lastTick: number | null = null;
+        this.listenFn = (level: number, tick: number) => {
+            if (lastTick !== null) {
+                const found = this.ahoCorasick.appendFind(tick - lastTick);
+                if (found) {
+                    const button = this.options?.remotes[found.remoteName]?.buttons[found.buttonName];
+                    this.emit('button', {
+                        raw: found,
+                        remoteName: found.remoteName,
+                        buttonName: found.buttonName,
+                        button,
+                    });
+                }
+            }
+            lastTick = tick;
+        };
+
+        gpio.on('alert', this.listenFn);
+        gpio.enableAlert();
+    }
+
+    public stop(): void {
+        if (!this.listenFn) {
+            throw new Error('listening not started');
+        }
+
+        if (!this.inputGpio) {
+            throw new Error('input pin not defined');
+        }
+        const gpio: pigpio.Gpio = this.inputGpio;
+
+        gpio.disableAlert();
+        gpio.off('alert', this.listenFn);
     }
 }
