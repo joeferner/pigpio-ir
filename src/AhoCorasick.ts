@@ -1,9 +1,7 @@
-import {Button} from "./Button";
-
 interface TrieNode {
     signals: number[];
     averageSignal: number;
-    output: Button | null;
+    output: AhoCorasickButton | null;
     failure: TrieNode | null;
     children: { [child: number]: TrieNode };
 }
@@ -12,9 +10,11 @@ export interface AhoCorasickOptions {
     tolerance?: number;
 }
 
-export const DEFAULT_OPTIONS: Required<AhoCorasickOptions> = {
-    tolerance: 0.10
-};
+export interface AhoCorasickButton {
+    remoteName: string;
+    buttonName: string;
+    signal: number[];
+}
 
 function average(values: number[]): number {
     if (values.length > 0) {
@@ -24,16 +24,19 @@ function average(values: number[]): number {
 }
 
 export class AhoCorasick {
+    public static readonly DEFAULT_OPTIONS: Required<AhoCorasickOptions> = {
+        tolerance: 0.10
+    };
     private readonly trie: TrieNode;
     private readonly options: Required<AhoCorasickOptions>;
     private curNode: TrieNode;
 
-    constructor(buttons: Button[], options?: AhoCorasickOptions) {
-        this.options = {...DEFAULT_OPTIONS, ...options};
-        this.curCode = this.trie = this.buildTrie(buttons);
+    constructor(buttons: AhoCorasickButton[], options?: AhoCorasickOptions) {
+        this.options = {...AhoCorasick.DEFAULT_OPTIONS, ...options};
+        this.curNode = this.trie = this.buildTrie(buttons);
     }
 
-    private buildTrie(buttons: Button[]): TrieNode {
+    private buildTrie(buttons: AhoCorasickButton[]): TrieNode {
         const root: TrieNode = {
             signals: [],
             averageSignal: 0,
@@ -42,7 +45,7 @@ export class AhoCorasick {
             children: {}
         };
 
-        const add = (node: TrieNode, substr: number[], button: Button) => {
+        const add = (node: TrieNode, substr: number[], button: AhoCorasickButton) => {
             if (substr.length === 0) {
                 node.output = button;
                 return;
@@ -105,7 +108,7 @@ export class AhoCorasick {
         throw new Error('invalid state');
     }
 
-    appendFind(signal: number): Button | null {
+    appendFind(signal: number): AhoCorasickButton | null {
         const child = this.findChild(this.curNode, signal);
         if (child) {
             this.curNode = child;
