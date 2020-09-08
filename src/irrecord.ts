@@ -57,7 +57,7 @@ const argv = yargs
 
 async function run(args: Options) {
     const pigpioIr = await PigpioIr.fromFile(args.file, {
-        pin: args.pin,
+        inputPin: args.pin,
         tolerance: args.tolerance,
     });
 

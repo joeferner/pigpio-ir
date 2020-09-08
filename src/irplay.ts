@@ -2,16 +2,12 @@
 
 import yargs from 'yargs';
 import { PigpioIr } from './PigpioIr';
-import { Signal } from './Signal';
 
 interface Options {
     file: string;
     remote: string;
     button: string;
     pin: number;
-    tolerance: number;
-    tries: number;
-    timeout: number;
 }
 
 const argv = yargs
@@ -38,38 +34,17 @@ const argv = yargs
         type: 'number',
         require: true,
         description: 'IR input pin number',
-    })
-    .option('tolerance', {
-        type: 'number',
-        description: 'Signal matching tolerance',
-        default: PigpioIr.DEFAULT_FILE_OPTIONS.tolerance,
-    })
-    .option('tries', {
-        type: 'number',
-        description: 'Number of times to read each button',
-        default: 3,
-    })
-    .option('timeout', {
-        type: 'number',
-        description: 'Maximum time for an IR signal',
-        default: 500,
     }).argv;
 
 async function run(args: Options) {
     const pigpioIr = await PigpioIr.fromFile(args.file, {
-        pin: args.pin,
-        tolerance: args.tolerance,
+        create: false,
+        outputPin: args.pin,
     });
 
-    const signal = new Signal(args);
-    for (let i = 0; i < args.tries; i++) {
-        console.log(`Press the '${args.button}' on the '${args.remote}' remote`);
-        const singleSignal = await pigpioIr.readSignal(args.timeout);
-        signal.appendSignal(singleSignal);
-        console.log('OK');
-    }
-    await PigpioIr.setButtonInFile(args.file, args.remote, args.button, signal.result);
-    console.log(`Button '${args.button}' on remote '${args.remote}' saved`);
+    console.log('Playing button');
+    pigpioIr.transmit(args.remote, args.button);
+    console.log(`Button '${args.button}' on remote '${args.remote}' played`);
 }
 
 run(argv);

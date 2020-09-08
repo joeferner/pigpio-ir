@@ -2,31 +2,41 @@ import { AhoCorasick, AhoCorasickButton, AhoCorasickOptions } from './AhoCorasic
 import fs from 'fs';
 import { PigpioIrFile, Remote } from './PigpioIrFile';
 import pigpio from 'pigpio';
+import { PigpioTransmit } from './PigpioTransmit';
+
+const PIN_NOT_SET = -1;
+const CARRIER_FREQUENCY = 38000;
 
 interface PigpioIrOptions extends AhoCorasickOptions {
     remotes: { [name: string]: Remote };
-    pin: number;
+    outputPin?: number;
+    inputPin?: number;
 }
 
 export interface PigpioIrFileOptions extends AhoCorasickOptions {
     create?: boolean;
-    pin: number;
+    outputPin?: number;
+    inputPin?: number;
 }
 
 export class PigpioIr {
     private static readonly DEFAULT_OPTIONS: Required<PigpioIrOptions> = {
         ...AhoCorasick.DEFAULT_OPTIONS,
         remotes: {},
-        pin: -1,
+        outputPin: PIN_NOT_SET,
+        inputPin: PIN_NOT_SET,
     };
     public static readonly DEFAULT_FILE_OPTIONS: Required<PigpioIrFileOptions> = {
         ...AhoCorasick.DEFAULT_OPTIONS,
         create: true,
-        pin: -1,
+        outputPin: PIN_NOT_SET,
+        inputPin: PIN_NOT_SET,
     };
     private options: Required<PigpioIrOptions>;
     private ahoCorasick: AhoCorasick;
-    private inputGpio: pigpio.Gpio;
+    private inputGpio: pigpio.Gpio | undefined;
+    private outputGpio: pigpio.Gpio | undefined;
+    private outputPin: number | undefined;
 
     private constructor(options: PigpioIrOptions) {
         this.options = { ...PigpioIr.DEFAULT_OPTIONS, ...options };
@@ -34,9 +44,17 @@ export class PigpioIr {
             PigpioIr.fileButtonsToAhoCorasickButtons(this.options.remotes),
             this.options,
         );
-        this.inputGpio = new pigpio.Gpio(this.options.pin, {
-            mode: pigpio.Gpio.INPUT,
-        });
+        if (this.options.outputPin !== PIN_NOT_SET) {
+            this.outputPin = this.options.outputPin;
+            this.outputGpio = new pigpio.Gpio(this.options.outputPin, {
+                mode: pigpio.Gpio.OUTPUT,
+            });
+        }
+        if (this.options.inputPin !== PIN_NOT_SET) {
+            this.inputGpio = new pigpio.Gpio(this.options.inputPin, {
+                mode: pigpio.Gpio.INPUT,
+            });
+        }
     }
 
     private static fileButtonsToAhoCorasickButtons(remotes: { [remoteName: string]: Remote }) {
@@ -54,14 +72,18 @@ export class PigpioIr {
                 ahoCorasickButtons.push({
                     remoteName,
                     buttonName,
-                    signal: button.signal.split(',').map((n) => parseFloat(n)),
+                    signal: PigpioIr.parseSignal(button.signal),
                 });
             }
         }
         return ahoCorasickButtons;
     }
 
-    static async fromFile(file: string, options: PigpioIrFileOptions): Promise<PigpioIr> {
+    private static parseSignal(signal: string): number[] {
+        return signal.split(',').map((n) => parseFloat(n));
+    }
+
+    public static async fromFile(file: string, options: PigpioIrFileOptions): Promise<PigpioIr> {
         const reqOptions: Required<PigpioIrFileOptions> = {
             ...PigpioIr.DEFAULT_FILE_OPTIONS,
             ...options,
@@ -72,12 +94,16 @@ export class PigpioIr {
         return new PigpioIr({ ...reqOptions, ...fileContents });
     }
 
-    readSignal(timeout: number): Promise<number[]> {
+    public async readSignal(timeout: number): Promise<number[]> {
+        if (!this.inputGpio) {
+            throw new Error('input pin not defined');
+        }
+        const gpio: pigpio.Gpio = this.inputGpio;
         return new Promise<number[]>((resolve) => {
             const signal: number[] = [];
             let startTime: number | null = null;
             let lastTick: number | null = null;
-            this.inputGpio.on('alert', (level, tick) => {
+            gpio.on('alert', (level, tick) => {
                 if (lastTick !== null) {
                     signal.push(tick - lastTick);
                 }
@@ -91,9 +117,9 @@ export class PigpioIr {
                 lastTick = tick;
             });
 
-            this.inputGpio.enableAlert();
+            gpio.enableAlert();
         }).finally(() => {
-            this.inputGpio.disableAlert();
+            gpio.disableAlert();
         });
     }
 
@@ -128,5 +154,33 @@ export class PigpioIr {
             }
             throw err;
         }
+    }
+
+    async transmit(remoteName: string, buttonName: string, options?: { timeout: number }): Promise<void> {
+        const reqOptions = {
+            timeout: 500,
+            ...options,
+        };
+
+        if (!this.outputGpio || !this.outputPin) {
+            throw new Error('output pin not defined');
+        }
+
+        const remote = this.options.remotes[remoteName];
+        if (!remote) {
+            throw new Error(`Could not find remote '${remoteName}'`);
+        }
+        const button = remote.buttons[buttonName];
+        if (!button) {
+            throw new Error(`Could not find button '${buttonName}' on remote '${remoteName}'`);
+        }
+
+        return PigpioTransmit.transmit(
+            this.outputPin,
+            this.outputGpio,
+            PigpioIr.parseSignal(button.signal),
+            reqOptions.timeout,
+            CARRIER_FREQUENCY,
+        );
     }
 }
