@@ -3,7 +3,7 @@ export interface SignalOptions {
 }
 
 export const DEFAULT_OPTIONS: Required<SignalOptions> = {
-    tolerance: 0.10
+    tolerance: 0.1,
 };
 
 export class Signal {
@@ -11,7 +11,7 @@ export class Signal {
     private signals: number[][] = [];
 
     constructor(options: SignalOptions) {
-        this._options = {...DEFAULT_OPTIONS, ...options};
+        this._options = { ...DEFAULT_OPTIONS, ...options };
     }
 
     appendSignal(signal: number[]): void {

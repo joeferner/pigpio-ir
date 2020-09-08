@@ -1,7 +1,7 @@
-import {AhoCorasick, AhoCorasickButton, AhoCorasickOptions} from "./AhoCorasick";
-import fs from "fs";
-import {PigpioIrFile, Remote} from "./PigpioIrFile";
-import pigpio from "pigpio";
+import { AhoCorasick, AhoCorasickButton, AhoCorasickOptions } from './AhoCorasick';
+import fs from 'fs';
+import { PigpioIrFile, Remote } from './PigpioIrFile';
+import pigpio from 'pigpio';
 
 interface PigpioIrOptions extends AhoCorasickOptions {
     remotes: { [name: string]: Remote };
@@ -17,24 +17,26 @@ export class PigpioIr {
     private static readonly DEFAULT_OPTIONS: Required<PigpioIrOptions> = {
         ...AhoCorasick.DEFAULT_OPTIONS,
         remotes: {},
-        pin: -1
+        pin: -1,
     };
     public static readonly DEFAULT_FILE_OPTIONS: Required<PigpioIrFileOptions> = {
         ...AhoCorasick.DEFAULT_OPTIONS,
         create: true,
-        pin: -1
+        pin: -1,
     };
     private options: Required<PigpioIrOptions>;
     private ahoCorasick: AhoCorasick;
     private inputGpio: pigpio.Gpio;
 
     private constructor(options: PigpioIrOptions) {
-        this.options = {...PigpioIr.DEFAULT_OPTIONS, ...options};
+        this.options = { ...PigpioIr.DEFAULT_OPTIONS, ...options };
         this.ahoCorasick = new AhoCorasick(
             PigpioIr.fileButtonsToAhoCorasickButtons(this.options.remotes),
-            this.options
+            this.options,
         );
-        this.inputGpio = new pigpio.Gpio(this.options.pin, {mode: pigpio.Gpio.INPUT});
+        this.inputGpio = new pigpio.Gpio(this.options.pin, {
+            mode: pigpio.Gpio.INPUT,
+        });
     }
 
     private static fileButtonsToAhoCorasickButtons(remotes: { [remoteName: string]: Remote }) {
@@ -52,21 +54,26 @@ export class PigpioIr {
                 ahoCorasickButtons.push({
                     remoteName,
                     buttonName,
-                    signal: button.signal.split(',').map(n => parseFloat(n))
-                })
+                    signal: button.signal.split(',').map((n) => parseFloat(n)),
+                });
             }
         }
         return ahoCorasickButtons;
     }
 
     static async fromFile(file: string, options: PigpioIrFileOptions): Promise<PigpioIr> {
-        const reqOptions: Required<PigpioIrFileOptions> = {...PigpioIr.DEFAULT_FILE_OPTIONS, ...options};
-        const fileContents: PigpioIrFile = await PigpioIr.readFile(file, {create: reqOptions.create});
-        return new PigpioIr({...reqOptions, ...fileContents});
+        const reqOptions: Required<PigpioIrFileOptions> = {
+            ...PigpioIr.DEFAULT_FILE_OPTIONS,
+            ...options,
+        };
+        const fileContents: PigpioIrFile = await PigpioIr.readFile(file, {
+            create: reqOptions.create,
+        });
+        return new PigpioIr({ ...reqOptions, ...fileContents });
     }
 
     readSignal(timeout: number): Promise<number[]> {
-        return new Promise<number[]>((resolve, reject) => {
+        return new Promise<number[]>((resolve) => {
             const signal: number[] = [];
             let startTime: number | null = null;
             let lastTick: number | null = null;
@@ -90,26 +97,33 @@ export class PigpioIr {
         });
     }
 
-    static async setButtonInFile(file: string, remoteName: string, buttonName: string, signal: number[]): Promise<void> {
-        const fileContents: PigpioIrFile = await this.readFile(file, {create: true});
+    static async setButtonInFile(
+        file: string,
+        remoteName: string,
+        buttonName: string,
+        signal: number[],
+    ): Promise<void> {
+        const fileContents: PigpioIrFile = await this.readFile(file, {
+            create: true,
+        });
         if (!fileContents.remotes[remoteName]) {
-            fileContents.remotes[remoteName] = {buttons: {}};
+            fileContents.remotes[remoteName] = { buttons: {} };
         }
         const remote: Remote = fileContents.remotes[remoteName];
         remote.buttons[buttonName] = {
-            signal: signal.join(',')
+            signal: signal.join(','),
         };
         await fs.promises.writeFile(file, JSON.stringify(fileContents, null, 2) + '\n', 'utf8');
     }
 
     private static async readFile(file: string, options: { create: boolean }): Promise<PigpioIrFile> {
         try {
-            const fileContents = await fs.promises.readFile(file, "utf8");
+            const fileContents = await fs.promises.readFile(file, 'utf8');
             return JSON.parse(fileContents) as PigpioIrFile;
         } catch (err) {
             if (options.create && err.code === 'ENOENT') {
                 return {
-                    remotes: {}
+                    remotes: {},
                 };
             }
             throw err;

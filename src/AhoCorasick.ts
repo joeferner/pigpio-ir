@@ -25,14 +25,14 @@ function average(values: number[]): number {
 
 export class AhoCorasick {
     public static readonly DEFAULT_OPTIONS: Required<AhoCorasickOptions> = {
-        tolerance: 0.10
+        tolerance: 0.1,
     };
     private readonly trie: TrieNode;
     private readonly options: Required<AhoCorasickOptions>;
     private curNode: TrieNode;
 
     constructor(buttons: AhoCorasickButton[], options?: AhoCorasickOptions) {
-        this.options = {...AhoCorasick.DEFAULT_OPTIONS, ...options};
+        this.options = { ...AhoCorasick.DEFAULT_OPTIONS, ...options };
         this.curNode = this.trie = this.buildTrie(buttons);
     }
 
@@ -42,7 +42,7 @@ export class AhoCorasick {
             averageSignal: 0,
             output: null,
             failure: null,
-            children: {}
+            children: {},
         };
 
         const add = (node: TrieNode, substr: number[], button: AhoCorasickButton) => {
@@ -60,7 +60,7 @@ export class AhoCorasick {
                     averageSignal: substr[0],
                     output: null,
                     failure: null,
-                    children: {}
+                    children: {},
                 };
                 node.children[substr[0]] = child;
             }
@@ -81,7 +81,7 @@ export class AhoCorasick {
         }
 
         let node;
-        while (node = queue.shift()) {
+        while ((node = queue.shift())) {
             for (const child of Object.values(node.children)) {
                 child.failure = this.findFailure(child, node);
                 queue.push(child);
