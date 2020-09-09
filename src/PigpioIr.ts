@@ -4,6 +4,9 @@ import { Button, PigpioIrFile, Remote } from './PigpioIrFile';
 import pigpio from 'pigpio';
 import { PigpioTransmit } from './PigpioTransmit';
 import events from 'events';
+import Debug from 'debug';
+
+const debug = Debug('pigpio-ir:PigpioIr');
 
 const PIN_NOT_SET = -1;
 const CARRIER_FREQUENCY = 38000;
@@ -198,6 +201,7 @@ export class PigpioIr extends events.EventEmitter implements PigpioIrEvents {
             throw new Error(`Could not find button '${buttonName}' on remote '${remoteName}'`);
         }
 
+        debug(`transmitting ${remoteName}:${buttonName}`);
         return PigpioTransmit.transmit(
             this.outputPin,
             this.outputGpio,
@@ -225,6 +229,7 @@ export class PigpioIr extends events.EventEmitter implements PigpioIrEvents {
             if (lastTick !== null) {
                 const found = this.ahoCorasick.appendFind(tick - lastTick);
                 if (found) {
+                    debug(`received ${found.remoteName}:${found.buttonName}`);
                     const button = this._options?.remotes[found.remoteName]?.buttons[found.buttonName];
                     this.emit('button', {
                         raw: found,
@@ -237,8 +242,10 @@ export class PigpioIr extends events.EventEmitter implements PigpioIrEvents {
             lastTick = tick;
         };
 
+        debug(`starting`);
         gpio.on('alert', this.listenFn);
         gpio.enableAlert();
+        debug(`started`);
     }
 
     public stop(): void {
@@ -251,7 +258,9 @@ export class PigpioIr extends events.EventEmitter implements PigpioIrEvents {
         }
         const gpio: pigpio.Gpio = this.inputGpio;
 
+        debug(`stopping`);
         gpio.disableAlert();
         gpio.off('alert', this.listenFn);
+        debug(`stopped`);
     }
 }
