@@ -44,7 +44,7 @@ export class PigpioIr extends events.EventEmitter implements PigpioIrEvents {
         outputPin: PIN_NOT_SET,
         inputPin: PIN_NOT_SET,
     };
-    private options: Required<PigpioIrOptions>;
+    private _options: Required<PigpioIrOptions>;
     private ahoCorasick: AhoCorasick;
     private inputGpio: pigpio.Gpio | undefined;
     private outputGpio: pigpio.Gpio | undefined;
@@ -53,22 +53,26 @@ export class PigpioIr extends events.EventEmitter implements PigpioIrEvents {
 
     private constructor(options: PigpioIrOptions) {
         super();
-        this.options = { ...PigpioIr.DEFAULT_OPTIONS, ...options };
+        this._options = { ...PigpioIr.DEFAULT_OPTIONS, ...options };
         this.ahoCorasick = new AhoCorasick(
-            PigpioIr.fileButtonsToAhoCorasickButtons(this.options.remotes),
-            this.options,
+            PigpioIr.fileButtonsToAhoCorasickButtons(this._options.remotes),
+            this._options,
         );
-        if (this.options.outputPin !== PIN_NOT_SET) {
-            this.outputPin = this.options.outputPin;
-            this.outputGpio = new pigpio.Gpio(this.options.outputPin, {
+        if (this._options.outputPin !== PIN_NOT_SET) {
+            this.outputPin = this._options.outputPin;
+            this.outputGpio = new pigpio.Gpio(this._options.outputPin, {
                 mode: pigpio.Gpio.OUTPUT,
             });
         }
-        if (this.options.inputPin !== PIN_NOT_SET) {
-            this.inputGpio = new pigpio.Gpio(this.options.inputPin, {
+        if (this._options.inputPin !== PIN_NOT_SET) {
+            this.inputGpio = new pigpio.Gpio(this._options.inputPin, {
                 mode: pigpio.Gpio.INPUT,
             });
         }
+    }
+
+    public get options(): Required<PigpioIrOptions> {
+        return this._options;
     }
 
     private static fileButtonsToAhoCorasickButtons(remotes: { [remoteName: string]: Remote }) {
@@ -185,7 +189,7 @@ export class PigpioIr extends events.EventEmitter implements PigpioIrEvents {
             throw new Error('output pin not defined');
         }
 
-        const remote = this.options.remotes[remoteName];
+        const remote = this._options.remotes[remoteName];
         if (!remote) {
             throw new Error(`Could not find remote '${remoteName}'`);
         }
@@ -203,6 +207,10 @@ export class PigpioIr extends events.EventEmitter implements PigpioIrEvents {
         );
     }
 
+    public get started(): boolean {
+        return !!this.listenFn;
+    }
+
     public start(): void {
         if (this.listenFn) {
             throw new Error('listening already started');
@@ -217,7 +225,7 @@ export class PigpioIr extends events.EventEmitter implements PigpioIrEvents {
             if (lastTick !== null) {
                 const found = this.ahoCorasick.appendFind(tick - lastTick);
                 if (found) {
-                    const button = this.options?.remotes[found.remoteName]?.buttons[found.buttonName];
+                    const button = this._options?.remotes[found.remoteName]?.buttons[found.buttonName];
                     this.emit('button', {
                         raw: found,
                         remoteName: found.remoteName,
