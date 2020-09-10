@@ -1,6 +1,6 @@
 {
   "name": "pigpio-ir",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "pigpio IR Receiver/Transmitter",
   "main": "./dist/index.js",
   "scripts": {
