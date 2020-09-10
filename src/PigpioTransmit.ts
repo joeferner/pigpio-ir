@@ -1,28 +1,36 @@
 import pigpio, { GenericWaveStep } from 'pigpio';
+import AsyncLock from 'async-lock';
+import { sleep } from './sleep';
 import Timeout = NodeJS.Timeout;
 
 const MICROS_PER_SECOND = 1 * 1000 * 1000;
 
 export class PigpioTransmit {
+    private static readonly LOCK = new AsyncLock();
+
     public static async transmit(
         pin: number,
         gpio: pigpio.Gpio,
         signal: number[],
         timeout: number,
         carrierFrequency: number,
+        timeBetweenTransmits: number,
     ) {
-        gpio.digitalWrite(0);
-        try {
-            const waveId = PigpioTransmit.createWaveform(pin, signal, carrierFrequency);
-            try {
-                pigpio.waveTxSend(waveId, pigpio.WAVE_MODE_ONE_SHOT);
-                await PigpioTransmit.waitForWave(timeout);
-            } finally {
-                pigpio.waveDelete(waveId);
-            }
-        } finally {
+        return PigpioTransmit.LOCK.acquire(`pin${pin}`, async () => {
             gpio.digitalWrite(0);
-        }
+            try {
+                const waveId = PigpioTransmit.createWaveform(pin, signal, carrierFrequency);
+                try {
+                    pigpio.waveTxSend(waveId, pigpio.WAVE_MODE_ONE_SHOT);
+                    await PigpioTransmit.waitForWave(timeout);
+                } finally {
+                    pigpio.waveDelete(waveId);
+                }
+            } finally {
+                gpio.digitalWrite(0);
+                await sleep(timeBetweenTransmits);
+            }
+        });
     }
 
     private static createWaveform(pin: number, signal: number[], carrierFrequency: number): number {

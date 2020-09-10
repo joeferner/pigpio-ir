@@ -10,6 +10,7 @@ const debug = Debug('pigpio-ir:PigpioIr');
 
 const PIN_NOT_SET = -1;
 const CARRIER_FREQUENCY = 38000;
+const TIME_BETWEEN_TRANSMITS_MS = 100;
 
 interface PigpioIrOptions extends AhoCorasickOptions {
     remotes: { [name: string]: Remote };
@@ -208,6 +209,7 @@ export class PigpioIr extends events.EventEmitter implements PigpioIrEvents {
             PigpioIr.parseSignal(button.signal),
             reqOptions.timeout,
             CARRIER_FREQUENCY,
+            TIME_BETWEEN_TRANSMITS_MS,
         );
     }
 
