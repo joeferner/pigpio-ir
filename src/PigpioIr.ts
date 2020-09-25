@@ -62,16 +62,20 @@ export class PigpioIr extends events.EventEmitter implements PigpioIrEvents {
             PigpioIr.fileButtonsToAhoCorasickButtons(this._options.remotes),
             this._options,
         );
-        if (this._options.outputPin !== PIN_NOT_SET) {
-            this.outputPin = this._options.outputPin;
-            this.outputGpio = new pigpio.Gpio(this._options.outputPin, {
-                mode: pigpio.Gpio.OUTPUT,
-            });
-        }
-        if (this._options.inputPin !== PIN_NOT_SET) {
-            this.inputGpio = new pigpio.Gpio(this._options.inputPin, {
-                mode: pigpio.Gpio.INPUT,
-            });
+        if (process.env.NODE_ENV === 'development') {
+            debug('NODE_ENV set to development, skipping GPIO initialization');
+        } else {
+            if (this._options.outputPin !== PIN_NOT_SET) {
+                this.outputPin = this._options.outputPin;
+                this.outputGpio = new pigpio.Gpio(this._options.outputPin, {
+                    mode: pigpio.Gpio.OUTPUT,
+                });
+            }
+            if (this._options.inputPin !== PIN_NOT_SET) {
+                this.inputGpio = new pigpio.Gpio(this._options.inputPin, {
+                    mode: pigpio.Gpio.INPUT,
+                });
+            }
         }
     }
 
@@ -184,6 +188,11 @@ export class PigpioIr extends events.EventEmitter implements PigpioIrEvents {
     }
 
     async transmit(remoteName: string, buttonName: string, options?: { timeout: number }): Promise<void> {
+        if (process.env.NODE_ENV === 'development') {
+            debug(`skipping transmit, NODE_ENV set to development`);
+            return;
+        }
+
         const reqOptions = {
             timeout: 500,
             ...options,
@@ -220,6 +229,12 @@ export class PigpioIr extends events.EventEmitter implements PigpioIrEvents {
     public start(): void {
         if (this.listenFn) {
             throw new Error('listening already started');
+        }
+        if (process.env.NODE_ENV === 'development') {
+            debug(`skipping start, NODE_ENV set to development`);
+            // eslint-disable-next-line @typescript-eslint/no-empty-function
+            this.listenFn = () => {};
+            return;
         }
         if (!this.inputGpio) {
             throw new Error('input pin not defined');

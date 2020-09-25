@@ -15,8 +15,8 @@ export class PigpioTransmit {
         timeout: number,
         carrierFrequency: number,
         timeBetweenTransmits: number,
-    ) {
-        return PigpioTransmit.LOCK.acquire(`pin${pin}`, async () => {
+    ): Promise<void> {
+        await PigpioTransmit.LOCK.acquire(`pin${pin}`, async () => {
             gpio.digitalWrite(0);
             try {
                 const waveId = PigpioTransmit.createWaveform(pin, signal, carrierFrequency);
@@ -60,8 +60,8 @@ export class PigpioTransmit {
         return waveId;
     }
 
-    private static waitForWave(timeout: number): Promise<void> {
-        return new Promise<void>((resolve, reject) => {
+    private static async waitForWave(timeout: number): Promise<void> {
+        await new Promise<void>((resolve, reject) => {
             let interval: Timeout | null = setInterval(() => {
                 if (!pigpio.waveTxBusy()) {
                     if (clearTimers()) {
