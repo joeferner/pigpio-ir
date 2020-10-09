@@ -1,5 +1,6 @@
 export interface Button {
     signal: string;
+    debounce?: number;
 }
 
 export interface Remote {

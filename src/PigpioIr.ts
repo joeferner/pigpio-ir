@@ -54,6 +54,7 @@ export class PigpioIr extends events.EventEmitter implements PigpioIrEvents {
     private outputGpio: pigpio.Gpio | undefined;
     private outputPin: number | undefined;
     private listenFn?: (level: number, tick: number) => void;
+    private lastButtonReceived: { time: number; remoteName: string; buttonName: string } | undefined;
 
     private constructor(options: PigpioIrOptions) {
         super();
@@ -156,19 +157,23 @@ export class PigpioIr extends events.EventEmitter implements PigpioIrEvents {
 
     static async setButtonInFile(
         file: string,
-        remoteName: string,
-        buttonName: string,
-        signal: number[],
+        options: {
+            remoteName: string;
+            buttonName: string;
+            signal: number[];
+            debounce?: number;
+        },
     ): Promise<void> {
         const fileContents: PigpioIrFile = await this.readFile(file, {
             create: true,
         });
-        if (!fileContents.remotes[remoteName]) {
-            fileContents.remotes[remoteName] = { buttons: {} };
+        if (!fileContents.remotes[options.remoteName]) {
+            fileContents.remotes[options.remoteName] = { buttons: {} };
         }
-        const remote: Remote = fileContents.remotes[remoteName];
-        remote.buttons[buttonName] = {
-            signal: signal.join(','),
+        const remote: Remote = fileContents.remotes[options.remoteName];
+        remote.buttons[options.buttonName] = {
+            signal: options.signal.join(','),
+            debounce: options.debounce,
         };
         await fs.promises.writeFile(file, JSON.stringify(fileContents, null, 2) + '\n', 'utf8');
     }
@@ -248,6 +253,23 @@ export class PigpioIr extends events.EventEmitter implements PigpioIrEvents {
                 if (found) {
                     debug(`received ${found.remoteName}:${found.buttonName}`);
                     const button = this._options?.remotes[found.remoteName]?.buttons[found.buttonName];
+                    if (
+                        this.lastButtonReceived &&
+                        button?.debounce &&
+                        this.lastButtonReceived.remoteName === found.remoteName &&
+                        this.lastButtonReceived.buttonName === found.buttonName
+                    ) {
+                        const t = Date.now() - (this.lastButtonReceived.time || 0);
+                        if (t < button.debounce) {
+                            this.lastButtonReceived.time = Date.now();
+                            return;
+                        }
+                    }
+                    this.lastButtonReceived = {
+                        time: Date.now(),
+                        remoteName: found.remoteName,
+                        buttonName: found.buttonName,
+                    };
                     this.emit('button', {
                         raw: found,
                         remoteName: found.remoteName,

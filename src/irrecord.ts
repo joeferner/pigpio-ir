@@ -12,6 +12,7 @@ interface Options {
     tolerance: number;
     tries: number;
     timeout: number;
+    debounce?: number;
 }
 
 const argv = yargs
@@ -32,6 +33,10 @@ const argv = yargs
         type: 'string',
         require: true,
         description: 'Name of the button to learn',
+    })
+    .option('debounce', {
+        type: 'number',
+        description: 'Number of milliseconds between consecutive presses of this button',
     })
     .option('pin', {
         alias: 'p',
@@ -68,7 +73,12 @@ async function run(args: Options) {
         signal.appendSignal(singleSignal);
         console.log('OK');
     }
-    await PigpioIr.setButtonInFile(args.file, args.remote, args.button, signal.result);
+    await PigpioIr.setButtonInFile(args.file, {
+        remoteName: args.remote,
+        buttonName: args.button,
+        signal: signal.result,
+        debounce: args.debounce,
+    });
     console.log(`Button '${args.button}' on remote '${args.remote}' saved`);
 }
 
