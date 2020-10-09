@@ -10,7 +10,7 @@
     "format": "prettier --write \"src/**/*.ts\"",
     "lint": "eslint --fix --ext .ts .",
     "lint-staged": "lint-staged",
-    "pre-commit": "npm run format && npm run lint-staged",
+    "pre-commit": "npm run format && npm run lint-staged && npm run build",
     "irrecord": "ts-node ./src/irrecord.ts",
     "irplay": "ts-node ./src/irplay.ts",
     "irlisten": "ts-node ./src/irlisten.ts"
