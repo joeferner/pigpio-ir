@@ -89,15 +89,20 @@ export class PigpioIr extends events.EventEmitter implements PigpioIrEvents {
         } else {
             if (this._options.outputPin !== PIN_NOT_SET) {
                 this.outputPin = this._options.outputPin;
+                debug(`output pin ${this._options.inputPin} (flip: ${this._options.outputPinFlip ? 'true' : 'false'})`);
                 this.outputGpio = new pigpio.Gpio(this._options.outputPin, {
                     mode: pigpio.Gpio.OUTPUT,
                 });
                 this.outputGpio.digitalWrite(this._options.outputPinFlip ? 1 : 0);
             }
             if (this._options.inputPin !== PIN_NOT_SET) {
+                const pullUpDown = toPigpioPullUpDown(this._options.inputPullUpDown);
+                debug(
+                    `input pin ${this._options.inputPin} (pullUpDown: ${this._options.inputPullUpDown} - ${pullUpDown})`,
+                );
                 this.inputGpio = new pigpio.Gpio(this._options.inputPin, {
                     mode: pigpio.Gpio.INPUT,
-                    pullUpDown: toPigpioPullUpDown(this._options.inputPullUpDown),
+                    pullUpDown: pullUpDown,
                 });
             }
         }
@@ -144,28 +149,40 @@ export class PigpioIr extends events.EventEmitter implements PigpioIrEvents {
         return new PigpioIr({ ...reqOptions, ...fileContents });
     }
 
-    public async readSignal(timeout: number): Promise<number[]> {
+    public async readSignal(options: { maxPulse: number; timeout: number }): Promise<number[]> {
         if (!this.inputGpio) {
             throw new Error('input pin not defined');
         }
         const gpio: pigpio.Gpio = this.inputGpio;
 
-        let myResolve: (signal: number[]) => void;
+        let myResolve: ((signal: number[]) => void) | undefined;
         const signal: number[] = [];
         let startTime: number | null = null;
         let lastTick: number | null = null;
         const alertFn = (level: number, tick: number) => {
             if (lastTick !== null) {
-                signal.push(tick - lastTick);
+                const delta = tick - lastTick;
+                if (delta > options.maxPulse) {
+                    complete();
+                    return;
+                }
+                signal.push(delta);
             }
             if (startTime === null) {
-                setTimeout(() => {
-                    startTime = null;
-                    myResolve(signal);
-                }, timeout);
+                setTimeout(complete, options.timeout);
                 lastTick = startTime = tick;
             }
             lastTick = tick;
+        };
+
+        const complete = () => {
+            if (!myResolve) {
+                return;
+            }
+            startTime = null;
+            debug(`signal received: ${signal}`);
+            myResolve(signal);
+            myResolve = undefined;
         };
 
         return new Promise<number[]>((resolve) => {

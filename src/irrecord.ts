@@ -3,6 +3,7 @@
 import yargs from 'yargs';
 import { PigpioIr, PullUpDown } from './PigpioIr';
 import { Signal } from './Signal';
+import { sleep } from './sleep';
 
 interface Options {
     file: string;
@@ -10,8 +11,9 @@ interface Options {
     button: string;
     pin: number;
     tolerance: number;
-    tries: number;
+    maxTries: number;
     timeout: number;
+    maxPulse: number;
     debounce?: number;
     pullUpDown?: string;
 }
@@ -50,15 +52,20 @@ const argv = yargs
         description: 'Signal matching tolerance',
         default: PigpioIr.DEFAULT_FILE_OPTIONS.tolerance,
     })
-    .option('tries', {
+    .option('maxTries', {
         type: 'number',
-        description: 'Number of times to read each button',
-        default: 3,
+        description: 'Maximum number of times to read each button',
+        default: 10,
     })
     .option('timeout', {
         type: 'number',
-        description: 'Maximum time for an IR signal',
+        description: 'Maximum time for an IR signal in milliseconds',
         default: 500,
+    })
+    .option('maxPulse', {
+        type: 'number',
+        description: 'Maximum pulse width of an IR signal in microseconds',
+        default: 10000,
     })
     .option('pullUpDown', {
         type: 'string',
@@ -75,11 +82,15 @@ async function run(args: Options) {
     });
 
     const signal = new Signal(args);
-    for (let i = 0; i < args.tries; i++) {
+    for (let i = 0; i < args.maxTries; i++) {
         console.log(`Press the '${args.button}' on the '${args.remote}' remote`);
-        const singleSignal = await pigpioIr.readSignal(args.timeout);
+        const singleSignal = await pigpioIr.readSignal({ maxPulse: args.maxPulse, timeout: args.timeout });
         signal.appendSignal(singleSignal);
         console.log('OK');
+        if (signal.isComplete) {
+            break;
+        }
+        await sleep(1000);
     }
     await PigpioIr.setButtonInFile(args.file, {
         remoteName: args.remote,
@@ -90,4 +101,7 @@ async function run(args: Options) {
     console.log(`Button '${args.button}' on remote '${args.remote}' saved`);
 }
 
-run(argv);
+run(argv).catch((err) => {
+    console.log('record failed');
+    console.error(err.message);
+});
