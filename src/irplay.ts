@@ -8,6 +8,7 @@ interface Options {
     remote: string;
     button: string;
     pin: number;
+    flip?: boolean;
 }
 
 const argv = yargs
@@ -33,13 +34,18 @@ const argv = yargs
         alias: 'p',
         type: 'number',
         require: true,
-        description: 'IR input pin number',
+        description: 'IR output pin number',
+    })
+    .option('flip', {
+        type: 'boolean',
+        description: 'Flip output pin (ie initialize with high state)',
     }).argv;
 
 async function run(args: Options) {
     const pigpioIr = await PigpioIr.fromFile(args.file, {
         create: false,
         outputPin: args.pin,
+        outputPinFlip: args.flip,
     });
 
     console.log('Playing button');

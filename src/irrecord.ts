@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import yargs from 'yargs';
-import { PigpioIr } from './PigpioIr';
+import { PigpioIr, PullUpDown } from './PigpioIr';
 import { Signal } from './Signal';
 
 interface Options {
@@ -13,6 +13,7 @@ interface Options {
     tries: number;
     timeout: number;
     debounce?: number;
+    pullUpDown?: string;
 }
 
 const argv = yargs
@@ -58,12 +59,19 @@ const argv = yargs
         type: 'number',
         description: 'Maximum time for an IR signal',
         default: 500,
+    })
+    .option('pullUpDown', {
+        type: 'string',
+        description: 'Input pin pull up/down setting',
+        choices: Object.values(PullUpDown),
+        default: PigpioIr.DEFAULT_FILE_OPTIONS.inputPullUpDown,
     }).argv;
 
 async function run(args: Options) {
     const pigpioIr = await PigpioIr.fromFile(args.file, {
         inputPin: args.pin,
         tolerance: args.tolerance,
+        inputPullUpDown: args.pullUpDown as PullUpDown,
     });
 
     const signal = new Signal(args);

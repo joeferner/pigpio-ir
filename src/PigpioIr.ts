@@ -12,11 +12,18 @@ const PIN_NOT_SET = -1;
 const CARRIER_FREQUENCY = 38000;
 const TIME_BETWEEN_TRANSMITS_MS = 100;
 
+export enum PullUpDown {
+    UP = 'UP',
+    DOWN = 'DOWN',
+    OFF = 'OFF',
+}
+
 interface PigpioIrOptions extends AhoCorasickOptions {
     remotes: { [name: string]: Remote };
     outputPin?: number;
     outputPinFlip?: boolean;
     inputPin?: number;
+    inputPullUpDown?: PullUpDown;
 }
 
 export interface PigpioIrFileOptions extends AhoCorasickOptions {
@@ -24,6 +31,7 @@ export interface PigpioIrFileOptions extends AhoCorasickOptions {
     outputPin?: number;
     outputPinFlip?: boolean;
     inputPin?: number;
+    inputPullUpDown?: PullUpDown;
 }
 
 export interface ButtonEventData {
@@ -44,6 +52,7 @@ export class PigpioIr extends events.EventEmitter implements PigpioIrEvents {
         outputPin: PIN_NOT_SET,
         outputPinFlip: false,
         inputPin: PIN_NOT_SET,
+        inputPullUpDown: PullUpDown.OFF,
     };
     public static readonly DEFAULT_FILE_OPTIONS: Required<PigpioIrFileOptions> = {
         ...AhoCorasick.DEFAULT_OPTIONS,
@@ -51,6 +60,7 @@ export class PigpioIr extends events.EventEmitter implements PigpioIrEvents {
         outputPin: PIN_NOT_SET,
         outputPinFlip: false,
         inputPin: PIN_NOT_SET,
+        inputPullUpDown: PullUpDown.OFF,
     };
     private _options: Required<PigpioIrOptions>;
     private ahoCorasick: AhoCorasick;
@@ -63,6 +73,13 @@ export class PigpioIr extends events.EventEmitter implements PigpioIrEvents {
     private constructor(options: PigpioIrOptions) {
         super();
         this._options = { ...PigpioIr.DEFAULT_OPTIONS, ...options };
+        if (!Object.values(PullUpDown).includes(this._options.inputPullUpDown)) {
+            throw new Error(
+                `Invalid inputPullUpDown value. Expected one of "${Object.values(PullUpDown).join(', ')}", found "${
+                    this._options.inputPullUpDown
+                }"`,
+            );
+        }
         this.ahoCorasick = new AhoCorasick(
             PigpioIr.fileButtonsToAhoCorasickButtons(this._options.remotes),
             this._options,
@@ -80,6 +97,7 @@ export class PigpioIr extends events.EventEmitter implements PigpioIrEvents {
             if (this._options.inputPin !== PIN_NOT_SET) {
                 this.inputGpio = new pigpio.Gpio(this._options.inputPin, {
                     mode: pigpio.Gpio.INPUT,
+                    pullUpDown: toPigpioPullUpDown(this._options.inputPullUpDown),
                 });
             }
         }
@@ -307,5 +325,16 @@ export class PigpioIr extends events.EventEmitter implements PigpioIrEvents {
         gpio.disableAlert();
         gpio.off('alert', this.listenFn);
         debug(`stopped`);
+    }
+}
+
+function toPigpioPullUpDown(inputPullUpDown: PullUpDown): number {
+    switch (inputPullUpDown) {
+        case PullUpDown.DOWN:
+            return pigpio.Gpio.PUD_DOWN;
+        case PullUpDown.UP:
+            return pigpio.Gpio.PUD_UP;
+        default:
+            return pigpio.Gpio.PUD_OFF;
     }
 }
