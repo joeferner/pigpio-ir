@@ -11,15 +11,16 @@ export class PigpioTransmit {
     public static async transmit(
         pin: number,
         gpio: pigpio.Gpio,
+        gpioFlip: boolean,
         signal: number[],
         timeout: number,
         carrierFrequency: number,
         timeBetweenTransmits: number,
     ): Promise<void> {
         await PigpioTransmit.LOCK.acquire(`pin${pin}`, async () => {
-            gpio.digitalWrite(0);
+            gpio.digitalWrite(gpioFlip ? 1 : 0);
             try {
-                const waveId = PigpioTransmit.createWaveform(pin, signal, carrierFrequency);
+                const waveId = PigpioTransmit.createWaveform(pin, gpioFlip, signal, carrierFrequency);
                 try {
                     pigpio.waveTxSend(waveId, pigpio.WAVE_MODE_ONE_SHOT);
                     await PigpioTransmit.waitForWave(timeout);
@@ -27,13 +28,13 @@ export class PigpioTransmit {
                     pigpio.waveDelete(waveId);
                 }
             } finally {
-                gpio.digitalWrite(0);
+                gpio.digitalWrite(gpioFlip ? 1 : 0);
                 await sleep(timeBetweenTransmits);
             }
         });
     }
 
-    private static createWaveform(pin: number, signal: number[], carrierFrequency: number): number {
+    private static createWaveform(pin: number, gpioFlip: boolean, signal: number[], carrierFrequency: number): number {
         pigpio.waveClear();
 
         let on = true;
@@ -43,11 +44,21 @@ export class PigpioTransmit {
                 const pulseWidth = ((1.0 / carrierFrequency) * MICROS_PER_SECOND) / 2;
                 const count = Math.floor(item / pulseWidth / 2);
                 for (let i = 0; i < count; i++) {
-                    waveform.push({ gpioOn: pin, gpioOff: 0, usDelay: Math.round(pulseWidth) });
-                    waveform.push({ gpioOn: 0, gpioOff: pin, usDelay: Math.round(pulseWidth) });
+                    const usDelay = Math.round(pulseWidth);
+                    if (gpioFlip) {
+                        waveform.push({ gpioOn: 0, gpioOff: pin, usDelay: usDelay });
+                        waveform.push({ gpioOn: pin, gpioOff: 0, usDelay: usDelay });
+                    } else {
+                        waveform.push({ gpioOn: pin, gpioOff: 0, usDelay: usDelay });
+                        waveform.push({ gpioOn: 0, gpioOff: pin, usDelay: usDelay });
+                    }
                 }
             } else {
-                waveform.push({ gpioOn: 0, gpioOff: pin, usDelay: item });
+                if (gpioFlip) {
+                    waveform.push({ gpioOn: pin, gpioOff: 0, usDelay: item });
+                } else {
+                    waveform.push({ gpioOn: 0, gpioOff: pin, usDelay: item });
+                }
             }
             on = !on;
         }

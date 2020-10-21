@@ -15,12 +15,14 @@ const TIME_BETWEEN_TRANSMITS_MS = 100;
 interface PigpioIrOptions extends AhoCorasickOptions {
     remotes: { [name: string]: Remote };
     outputPin?: number;
+    outputPinFlip?: boolean;
     inputPin?: number;
 }
 
 export interface PigpioIrFileOptions extends AhoCorasickOptions {
     create?: boolean;
     outputPin?: number;
+    outputPinFlip?: boolean;
     inputPin?: number;
 }
 
@@ -40,12 +42,14 @@ export class PigpioIr extends events.EventEmitter implements PigpioIrEvents {
         ...AhoCorasick.DEFAULT_OPTIONS,
         remotes: {},
         outputPin: PIN_NOT_SET,
+        outputPinFlip: false,
         inputPin: PIN_NOT_SET,
     };
     public static readonly DEFAULT_FILE_OPTIONS: Required<PigpioIrFileOptions> = {
         ...AhoCorasick.DEFAULT_OPTIONS,
         create: true,
         outputPin: PIN_NOT_SET,
+        outputPinFlip: false,
         inputPin: PIN_NOT_SET,
     };
     private _options: Required<PigpioIrOptions>;
@@ -71,6 +75,7 @@ export class PigpioIr extends events.EventEmitter implements PigpioIrEvents {
                 this.outputGpio = new pigpio.Gpio(this._options.outputPin, {
                     mode: pigpio.Gpio.OUTPUT,
                 });
+                this.outputGpio.digitalWrite(this._options.outputPinFlip ? 1 : 0);
             }
             if (this._options.inputPin !== PIN_NOT_SET) {
                 this.inputGpio = new pigpio.Gpio(this._options.inputPin, {
@@ -220,6 +225,7 @@ export class PigpioIr extends events.EventEmitter implements PigpioIrEvents {
         return PigpioTransmit.transmit(
             this.outputPin,
             this.outputGpio,
+            this._options.outputPinFlip,
             PigpioIr.parseSignal(button.signal),
             reqOptions.timeout,
             CARRIER_FREQUENCY,
