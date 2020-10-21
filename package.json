@@ -1,6 +1,6 @@
 {
   "name": "pigpio-ir",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "pigpio IR Receiver/Transmitter",
   "main": "./dist/index.js",
   "scripts": {
@@ -42,10 +42,10 @@
     "typescript": "4.x"
   },
   "dependencies": {
-    "async-lock": "1.x",
-    "debug": "4.x",
-    "pigpio": "3.x",
-    "yargs": "15.x"
+    "async-lock": "1.2.x",
+    "debug": "4.2.x",
+    "pigpio": "3.2.x",
+    "yargs": "16.1.x"
   },
   "husky": {
     "hooks": {
